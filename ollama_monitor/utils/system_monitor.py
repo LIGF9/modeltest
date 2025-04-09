@@ -6,16 +6,15 @@
 用于获取系统资源信息和实时监控数据
 """
 
-import os
 import sys
 import platform
 import psutil
 import cpuinfo
 import time
-import traceback
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Dict, List, Any
 from dataclasses import dataclass
 import logging
+from ollama_monitor.utils.ollama_client import OllamaClient
 
 # 定义全局变量控制GPU功能
 GPU_AVAILABLE = False
@@ -67,6 +66,8 @@ class SystemMonitor:
         self.gpu_collector = GPUInfoCollector()
         # 初始化系统静态信息
         self._system_info = self._get_system_info()
+        # 初始化Ollama客户端
+        self.ollama_client = OllamaClient()
         # 初始化GPU可用性标志
         self.nvidia_gpu_available = False
     
@@ -214,10 +215,8 @@ class SystemMonitor:
         """
         try:
             import requests
-            response = requests.get("http://localhost:11434/api/version")
-            if response.status_code == 200:
-                return response.json().get("version", "未知")
-            return "未知"
+            version = self.ollama_client.get_version()
+            return version if version else "未知"
         except Exception:
             return "未知"
     

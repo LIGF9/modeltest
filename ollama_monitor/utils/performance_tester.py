@@ -8,10 +8,9 @@
 
 import time
 import json
-import asyncio
 import random
 import os
-from typing import Dict, List, Any, Tuple, Optional
+from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 
@@ -19,7 +18,7 @@ from .system_monitor import SystemMonitor
 from ollama_monitor.utils.ollama_client import OllamaClient
 import re
 import platform
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional
 
 
 @dataclass
@@ -426,7 +425,7 @@ class PerformanceTester:
         # 确保不超过请求数量
         return selected_prompts[:num_prompts]
     
-    def extract_model_parameter(self,model_name: str) -> float | int | None:
+    def extract_model_parameter(self,model_name: str) -> str | None:
             """
             从模型名称中提取参数量的数字，支持乘法表达式（如7x8B → 56）
             
@@ -434,7 +433,7 @@ class PerformanceTester:
                 model_name (str): 模型名称字符串，如 "Mixtral-8x7B"
                 
             Returns:
-                float | int | None: 解析后的数值，无匹配时返回 None
+                str| None: 解析后的数值，无匹配时返回 None
             """
             # 匹配所有可能的数字组合（含乘法表达式），例如 "7x8" 或 "3.5"
             pattern = r'(\d+\.?\d*(?:[xX]\d+\.?\d*)*)(?=[BM])'
@@ -453,7 +452,7 @@ class PerformanceTester:
                 for factor in factors:
                     num = float(factor) if '.' in factor else int(factor)
                     result *= num
-                return result if result != 1 else None
+                return f'{result}B' if result != 1 else None
             except (ValueError, TypeError):
                 return None
 
@@ -777,7 +776,7 @@ class PerformanceTester:
             
         if "context_window" in report.test_params:
             html += f"""
-            <p><strong>上下文窗口:</strong> {report.test_params.get("context_window", "未填写")//1024}K tokens</p>"""
+            <p><strong>上下文窗口:</strong> {report.test_params.get("context_window", "未填写")} tokens</p>"""
             
         html += f"""
             <p><strong>测试日期:</strong> {report.test_params.get("test_date", "未知")}</p>
@@ -941,7 +940,7 @@ Ollama版本: {getattr(system_info, "ollama_version", "未知")}
             
         if "context_window" in report.test_params:
             text += f"""
-上下文窗口: {report.test_params.get("context_window", "未填写")//1024}K tokens"""
+上下文窗口: {report.test_params.get("context_window", "未填写")} tokens"""
 
         text += f"""
 测试日期: {report.test_params.get("test_date", "未知")}

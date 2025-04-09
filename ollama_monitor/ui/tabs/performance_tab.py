@@ -322,6 +322,7 @@ class PerformanceTab(QWidget):
         # 保存引用
         self.client = ollama_client
         self.monitor = system_monitor
+        self.istesting = False
         
         # 初始化性能测试器
         self.tester = PerformanceTester(self.client, self.monitor)
@@ -809,7 +810,11 @@ class PerformanceTab(QWidget):
     
     def _start_test(self):
         """开始性能测试"""
+        
+        self.istesting = True
+
         try:
+            print("开始测试，istesting：", self.istesting)
             # 清空详情表格并初始化测试结果
             self._init_test_results(reset_input_values=False)
             
@@ -843,9 +848,7 @@ class PerformanceTab(QWidget):
             if model_params_input and model_params_input != "未识别" and model_params_input != "-":
                 test_params['model_params'] = model_params_input
             else:
-                # 尝试使用PerformanceTester的extract_model_parameter方法来提取模型参数
-                from ...utils.performance_tester import PerformanceTester
-                param = PerformanceTester.extract_model_parameter(model_name)
+                param = self.tester.extract_model_parameter(model_name)
                 if param is not None:
                     # 转换为字符串表示
                     if param >= 1:
@@ -856,12 +859,8 @@ class PerformanceTab(QWidget):
                     # 更新输入框
                     self._safe_access('parameters_input', lambda x: x.setText(model_params))
                 else:
-                    # 使用原方法作为备选
-                    model_params = self._extract_model_params_from_name(model_name)
-                    if model_params:
-                        test_params['model_params'] = model_params
-                        # 更新输入框
-                        self._safe_access('parameters_input', lambda x: x.setText(model_params))
+                    test_params['model_params'] = '0B'
+                    
                 
             # 获取编码精度
             precision = self._safe_access('precision_input', lambda x: x.text())
@@ -885,16 +884,10 @@ class PerformanceTab(QWidget):
             # 获取上下文窗口
             context_window = self._safe_access('context_window_input', lambda x: x.text())
             if context_window:
-                # 尝试转换为整数 - 支持K/M后缀
+                # 支持K/M后缀
                 try:
-                    if context_window.upper().endswith('K'):
-                        context_window_value = int(float(context_window[:-1]) * 1024)
-                    elif context_window.upper().endswith('M'):
-                        context_window_value = int(float(context_window[:-1]) * 1024 * 1024)
-                    else:
-                        context_window_value = int(context_window)
-                    
-                    test_params['context_window'] = context_window_value
+                    if context_window.upper().endswith('K') or context_window.upper().endswith('M'):
+                        test_params['context_window'] = context_window
                 except ValueError:
                     QMessageBox.warning(self, "参数错误", "上下文窗口必须为有效数字，可带K/M后缀")
                     return
@@ -960,7 +953,7 @@ class PerformanceTab(QWidget):
             
         except Exception as e:
             print(f"启动测试时错误: {e}")
-            QMessageBox.critical(self, "测试错误", f"无法启动测试: {e}")
+            QMessageBox.critical(self, "测试错误", f"无法启动测试: 请填写模型参数量")
             self._safe_access('start_btn', lambda x: {
                 x.setEnabled(True),
                 x.setStyleSheet("background-color: #2980b9; color: white; font-weight: bold; border-radius: 4px; padding: 4px;")
@@ -969,9 +962,12 @@ class PerformanceTab(QWidget):
                 x.setText("测试失败"),
                 x.setStyleSheet("font-weight: bold; color: #e74c3c;")
             })
-    
+
+        self.istesting = False
+
     def _stop_test(self):
         """停止/暂停性能测试"""
+        self.istesting = False
         try:
             # 检查测试工作线程是否存在且正在运行
             if not hasattr(self, 'test_worker') or self.test_worker is None:
@@ -1056,6 +1052,7 @@ class PerformanceTab(QWidget):
 
     def _continue_test(self):
         """继续暂停的测试"""
+        self.istesting = True
         try:
             # 检查测试是否处于暂停状态
             if not self.is_test_paused or not hasattr(self, 'test_worker') or self.test_worker is None:
@@ -1120,40 +1117,6 @@ class PerformanceTab(QWidget):
                 x.setText("恢复测试失败"),
                 x.setStyleSheet("font-weight: bold; color: #e74c3c;")
             })
-    
-    def _on_test_stopped(self):
-        """测试停止后的处理"""
-        try:
-            # 检查必要的UI组件
-            if hasattr(self, 'start_btn') and self.start_btn is not None:
-                self.start_btn.setEnabled(False)  # 修改为禁用开始按钮
-                self.start_btn.setStyleSheet("background-color: #cccccc; color: #888888; font-weight: bold; border-radius: 4px; padding: 4px;")
-            
-            if hasattr(self, 'stop_btn') and self.stop_btn is not None:
-                self.stop_btn.setEnabled(False)  # 修改为禁用停止按钮
-                self.stop_btn.setStyleSheet("background-color: #cccccc; color: #888888; font-weight: bold; border: 1px solid #cccccc; border-radius: 4px; padding: 4px;")
-            
-            if hasattr(self, 'operation_status') and self.operation_status is not None:
-                # 正常结果将由_handle_test_completed方法处理，如果线程未能发送test_completed信号，则显示此消息
-                self.operation_status.setText("测试已停止")
-                self.operation_status.setStyleSheet("font-weight: bold; color: #e74c3c;")
-                
-            # 如果有已完成的测试结果，则启用报告按钮
-            if hasattr(self, 'current_report') and self.current_report and len(self.current_report.results) > 0:
-                self._safe_access('export_html_btn', lambda x: x.setEnabled(True))
-                self._safe_access('export_txt_btn', lambda x: x.setEnabled(True))
-                
-                # 更新测试结果概述
-                details_table = self._safe_access('details_table')
-                if details_table:
-                    self._update_test_summary(details_table)
-            
-        except RuntimeError as e:
-            # 忽略已删除对象的错误
-            print(f"处理测试停止事件时出错: {e}")
-        except Exception as e:
-            # 捕获任何其他异常
-            print(f"处理测试停止事件时发生未知错误: {e}")
     
     def _init_test_results(self, reset_input_values=True):
         """初始化测试结果UI"""
@@ -1338,47 +1301,6 @@ class PerformanceTab(QWidget):
                     
         except Exception as e:
             print(f"计算模型载入时间错误: {e}")
-    
-    def _extract_model_params_from_name(self, model_name: str) -> str:
-        """从模型名称中提取模型参数"""
-        # 常见模型大小的关键词匹配
-        param_keywords = {
-            "70b": "70B",
-            "65b": "65B",
-            "34b": "34B",
-            "33b": "33B",
-            "30b": "30B",
-            "13b": "13B",
-            "14b": "14B",
-            "8b": "8B",
-            "7b": "7B", 
-            "6b": "6B",
-            "3b": "3B",
-            "2b": "2B",
-            "1.8b": "1.8B",
-            "1b": "1B",
-            "0.5b": "0.5B",
-            "500m": "500M",
-            "125m": "125M"
-        }
-        
-        # 转换为小写以便匹配
-        model_name_lower = model_name.lower()
-        
-        # 尝试匹配参数关键词
-        for keyword, display_value in param_keywords.items():
-            if keyword in model_name_lower:
-                return display_value
-                
-        # 如果没有匹配到预定义的关键词，尝试使用正则表达式提取数字部分
-        import re
-        matches = re.search(r'[^a-zA-Z]([\d\.]+)b', model_name_lower)
-        if matches:
-            param_value = matches.group(1)
-            return f"{param_value}B"
-            
-        # 未能提取到参数大小
-        return ""
 
     def _update_progress_animation(self):
         """更新进度条动画效果"""
@@ -1863,6 +1785,8 @@ class PerformanceTab(QWidget):
         
     def _export_html_report(self):
         """预览HTML格式的测试报告"""
+        self.update_parameters()
+
         if not hasattr(self, 'current_report') or self.current_report is None:
             QMessageBox.warning(self, "无可用报告", "当前没有可用的测试报告，请先完成测试")
             return
@@ -1891,7 +1815,8 @@ class PerformanceTab(QWidget):
     
     def _export_txt_report(self):
         """预览文本格式的测试报告"""
-        
+        self.update_parameters()
+
         if not hasattr(self, 'current_report') or self.current_report is None:
             QMessageBox.warning(self, "无可用报告", "当前没有可用的测试报告，请先完成测试")
             return
@@ -1918,6 +1843,27 @@ class PerformanceTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "报告生成错误", f"生成文本报告时出错: {str(e)}")
     
+    def update_parameters(self):
+        if hasattr(self, 'parameters_input') and self.parameters_input is not None:
+            model_params = self.parameters_input.text()
+        if hasattr(self, 'precision_input') and self.precision_input is not None:
+            precision_input = self.precision_input.text()
+        if hasattr(self, 'temperature_input') and self.temperature_input is not None:
+            temperature_input = self.temperature_input.text()
+        if hasattr(self, 'context_window_input') and self.context_window_input is not None:
+            context_window_input = self.context_window_input.text()
+        print("当前报告参数:", self.current_report.test_params)
+        print("更新参数:", model_params, precision_input, temperature_input, context_window_input)
+        # 更新当前报告的测试参数
+        test_params = self.current_report.test_params 
+        test_params['model_params'] = model_params
+        test_params['model_precision'] = precision_input
+        test_params['model_temperature'] = float(temperature_input)
+        test_params['context_window'] = context_window_input
+        # 更新当前报告的测试参数
+        self.current_report.test_params = test_params
+        print("更新后报告参数:", self.current_report.test_params)
+
     def set_model(self, model_name: str):
         """
         设置当前使用的模型
@@ -1935,7 +1881,7 @@ class PerformanceTab(QWidget):
             
             # 尝试从模型名称中识别参数量并自动填充
             if hasattr(self, 'parameters_input') and self.parameters_input is not None:
-                model_params = self._extract_model_params_from_name(model_name)
+                model_params = self.tester.extract_model_parameter(model_name)
                 self.parameters_input.setText(model_params if model_params else "未识别")
                 
                 # 将焦点设置回窗口本身，防止参数输入框获得焦点
@@ -1947,25 +1893,12 @@ class PerformanceTab(QWidget):
     def on_tab_selected(self):
         """标签页被选中时调用"""
         # 当标签页被选中时，尝试自动填充模型参数（如果当前未填充）
-        try:
-            from ...utils.performance_tester import PerformanceTester
-            
+        try:            
             if (hasattr(self, 'parameters_input') and self.parameters_input is not None and 
                     (not self.parameters_input.text() or self.parameters_input.text() == "-" or self.parameters_input.text() == "未识别")):
-                # 尝试从模型名称中识别参数量，使用PerformanceTester的extract_model_parameter方法
                 if self.current_model:
                     # 使用tester中的提取方法（静态方法）
-                    param = PerformanceTester.extract_model_parameter(self.current_model)
-                    if param is not None:
-                        # 转换为字符串表示
-                        if param >= 1:
-                            model_params = f"{param}B"
-                        else:
-                            model_params = f"{int(param * 1000)}M"
-                    else:
-                        # 使用原方法作为备选
-                        model_params = self._extract_model_params_from_name(self.current_model)
-                    
+                    model_params = self.tester.extract_model_parameter(self.current_model)                    
                     self.parameters_input.setText(model_params if model_params else "未识别")
                     
                     # 将焦点设置回窗口本身，防止参数输入框获得焦点

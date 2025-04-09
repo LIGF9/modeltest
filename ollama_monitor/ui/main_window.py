@@ -50,7 +50,12 @@ class MainWindow(QMainWindow):
         else:
             print("\nollama运行正常")
         config = self.ollama_client.get_current_config()
-        print(f"ollama默认配置: {config['num_parallel']}并发/{config['max_models']}模型","\n")
+        # print("config",config)
+        # 检查并发设置
+        if config["parallel_enabled"]:
+            print(f"ollama并发配置: {config['num_parallel']}并发/{config['max_models']}模型","\n")
+        else:
+            print("ollama并发配置: 未启用","\n")
         
         # 初始化UI元素
         self._init_ui()
@@ -248,6 +253,11 @@ class MainWindow(QMainWindow):
         pass
     
     def _on_connect_clicked(self):
+        print("self.performance_tab.istesting:",self.performance_tab.istesting)
+        if self.performance_tab.istesting:
+            QMessageBox.warning(self, "测试中", "正在进行性能测试，请稍后再试。")
+            return
+
         """连接按钮点击事件处理"""
         server_url = self.server_input.currentText()
         
