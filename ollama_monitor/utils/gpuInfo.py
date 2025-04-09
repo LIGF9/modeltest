@@ -13,8 +13,17 @@ class GPUInfoCollector:
         """主收集方法"""
         try:
             # DXDIAG信息
-            self.get_with_dxdiag()   
-            # self._fallback_collect()             
+            self.get_with_dxdiag()
+            counter = 0
+            # 处理dxdiag结果
+            for device in self.results:
+                # 检查显存合理性
+                if device['dedicated'] <= 0 and device['shared'] <= 0:
+                    continue
+                else:
+                    counter += 1
+            if counter == 0:
+                self._fallback_collect()
                             
         except Exception as e:
             print(f"[收集错误] {str(e)}")      
@@ -37,17 +46,18 @@ class GPUInfoCollector:
         
         for device in self.results:
             name = device['name'].lower()
+            names = [device["name"] for device in filtered]
             
             # 排除常见虚拟设备
             if re.search(r'oray|virtual|software|microsoft basic|parsec|idd|device|driver|display', name):
                 continue
                 
             # 检查显存合理性
-            if device['dedicated'] < 0 and device['shared'] < 0:
+            if device['dedicated'] <= 0 and device['shared'] <= 0:
                 continue
                 
             # 检查是否包含显卡关键词
-            if any(re.search(kw, name) for kw in gpu_keywords):
+            if any(re.search(kw, name) for kw in gpu_keywords) and name not in names:
                 filtered.append(device)
                 
         self.results = filtered

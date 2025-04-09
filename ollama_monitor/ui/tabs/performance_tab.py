@@ -518,8 +518,8 @@ class PerformanceTab(QWidget):
         # 第三行：编码精度、模型温度、上下文窗口可编辑文本框
         results_layout.addWidget(QLabel("编码精度:"), 2, 0)
         self.precision_input = QLineEdit()
-        self.precision_input.setPlaceholderText("例如: INT8")
-        self.precision_input.setText("INT8")  # 设置默认值为INT8
+        self.precision_input.setPlaceholderText("例如: INT8、FP16")
+        self.precision_input.setText("INT4")  # 设置默认值为INT8
         self.precision_input.setMaximumWidth(120)
         # 设置焦点策略为ClickFocus
         self.precision_input.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
@@ -1171,7 +1171,7 @@ class PerformanceTab(QWidget):
             
             # 如果需要，重置输入值（但保持默认设置）
             if reset_input_values:
-                self._safe_access('precision_input', lambda x: x.setText("INT8"))
+                self._safe_access('precision_input', lambda x: x.setText("INT4"))
                 self._safe_access('temperature_input', lambda x: x.setText("0.8"))
                 self._safe_access('context_window_input', lambda x: x.setText("128K"))
             
@@ -1989,7 +1989,7 @@ class PerformanceTab(QWidget):
             self._safe_access('model_load_time_label', lambda x: x.setText("-"))
             
             # 设置默认值
-            self._safe_access('precision_input', lambda x: x.setText("INT8"))
+            self._safe_access('precision_input', lambda x: x.setText("INT4"))
             self._safe_access('temperature_input', lambda x: x.setText("0.8"))
             self._safe_access('context_window_input', lambda x: x.setText("128K"))
             
@@ -2474,7 +2474,6 @@ class PerformanceTestWorker(QThread):
         print("-"*50)
         print(f"模型 {self.model} 性能测试完成 {date_time}")
         print("-"*50)
-        print(f"\n\n\n\n")
             
     def _progress_callback(self, completed, total):
         """进度回调函数"""
