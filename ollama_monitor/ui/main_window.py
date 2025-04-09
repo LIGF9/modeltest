@@ -103,18 +103,24 @@ class MainWindow(QMainWindow):
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
         
-        # 状态栏元素
-        self.concurrency_status = QLabel()
+        # 状态栏元素 - 从左到右的顺序定义
+        self.ollama_version_label = QLabel("Ollama版本: --")
         self.connection_status = QLabel()
         self.server_latency = QLabel()
+        self.concurrency_status = QLabel()
         self.cpu_usage = QLabel()
         self.memory_usage = QLabel()
+        self.network_traffic = QLabel("网速: 上传 0 KB/s | 下载 0 KB/s")
         
-        self.status_bar.addWidget(self.concurrency_status)
-        self.status_bar.addPermanentWidget(self.connection_status)
-        self.status_bar.addPermanentWidget(self.server_latency)
+        # 添加到状态栏 - 确保Ollama版本在最左侧
+        self.status_bar.addWidget(self.ollama_version_label)  # 最左侧第一个
+        self.status_bar.addWidget(self.connection_status)     # 连接状态放在版本右侧
+        self.status_bar.addWidget(self.server_latency)        # 延迟放在连接状态右侧
+        self.status_bar.addWidget(self.concurrency_status)    # 并发状态放在第四位置
+        # 右侧元素
         self.status_bar.addPermanentWidget(self.cpu_usage)
         self.status_bar.addPermanentWidget(self.memory_usage)
+        self.status_bar.addPermanentWidget(self.network_traffic)
         
         # 设置中心部件
         self.setCentralWidget(central_widget)
@@ -348,24 +354,30 @@ class MainWindow(QMainWindow):
     
     def _update_status_bar(self):
         """更新状态栏信息"""
-        # 更新并发设置状态
-        self.concurrency_status.setText(self.concurrency_settings.get_status_text())
+        # 更新Ollama版本
+        version = self.ollama_client.get_version()
+        self.ollama_version_label.setText(f"Ollama版本: {version}")
         
         # 更新连接状态
         connected, latency = self.ollama_client.ping()
         if connected:
-            self.connection_status.setText(f"Ollama已连接")
-            self.connection_status.setStyleSheet("color: black;")#黑色
+            self.connection_status.setText(f"状态: 已连接")
             self.server_latency.setText(f"延迟: {latency:.1f} ms")
         else:
-            self.connection_status.setText("Olllama连接失败")
-            self.server_latency.setText("延迟: --")
-            self.connection_status.setStyleSheet("color: #e74c3c;")#红色
+            self.connection_status.setText("状态: 未连接")
+            self.connection_status.setStyleSheet("color: #e74c3c;")  # 红色加粗
+            self.server_latency.setText("延迟: -- ms")
+        
+        # 更新并发设置状态
+        self.concurrency_status.setText(self.concurrency_settings.get_status_text())
         
         # 更新系统指标
         metrics = self.system_monitor.get_metrics()
         self.cpu_usage.setText(f"CPU: {metrics.cpu_percent:.1f}%")
         self.memory_usage.setText(f"内存: {metrics.memory_percent:.1f}%")
+        
+        # 更新网络流量信息
+        self.network_traffic.setText(f"网速: 上传 {metrics.network_sent:.1f} KB/s | 下载 {metrics.network_recv:.1f} KB/s")
     
     def _show_about(self):
         """显示关于对话框"""

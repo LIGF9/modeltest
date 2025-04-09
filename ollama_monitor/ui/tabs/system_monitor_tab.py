@@ -176,8 +176,6 @@ class SystemMonitorTab(QWidget):
         self.gpu_labels = []  # 存储GPU标签的列表
         
         self.python_label = QLabel("Python版本: 加载中...")
-        self.ollama_label = QLabel("Ollama版本: 加载中...")
-        self.network_label = QLabel("实时网速: 上传 0 KB/s | 下载 0 KB/s")
         
         # 使用网格布局排列标签
         self.gpu_info_layout.addWidget(self.os_label, 0, 0, 1, 4)  # 操作系统占整行
@@ -189,11 +187,12 @@ class SystemMonitorTab(QWidget):
         # 预留GPU信息的位置 - 会在_update_static_info中动态添加
         self.gpu_info_row = 2  # 从第3行开始添加GPU信息
         
-        # 注意：网速信息将移动到GPU后面，在_update_static_info中处理
+        # 添加空行与Python版本之间形成分隔
+        empty_label = QLabel("")
+        self.gpu_info_layout.addWidget(empty_label, 99, 0, 1, 4)  # 空行占据整行
         
-        # Python和Ollama版本
-        self.gpu_info_layout.addWidget(self.python_label, 100, 0, 1, 2)  # 使用较大的行号确保在最后
-        self.gpu_info_layout.addWidget(self.ollama_label, 100, 2, 1, 2)
+        # Python版本（现在只显示Python版本，不显示Ollama版本）
+        self.gpu_info_layout.addWidget(self.python_label, 100, 0, 1, 4)  # 使用较大的行号确保在最后
         
         # 添加到主布局
         main_layout.addWidget(info_group)
@@ -207,19 +206,20 @@ class SystemMonitorTab(QWidget):
         all_metrics_layout = QVBoxLayout(self.all_metrics_widget)
         all_metrics_layout.setSpacing(15)
         
+        # 合并CPU和内存使用率为一个组
+        system_group = QGroupBox("系统资源使用率")
+        system_layout = QVBoxLayout(system_group)
+        
         # CPU使用率指标
-        cpu_group = QGroupBox("CPU使用率")
-        cpu_layout = QVBoxLayout(cpu_group)
         self.cpu_metric = MetricProgressBar(self, "CPU使用率", "#e74c3c")  # 红色
-        cpu_layout.addWidget(self.cpu_metric)
-        all_metrics_layout.addWidget(cpu_group)
+        system_layout.addWidget(self.cpu_metric)
         
         # 内存使用率指标
-        memory_group = QGroupBox("内存使用率")
-        memory_layout = QVBoxLayout(memory_group)
         self.memory_metric = MetricProgressBar(self, "内存使用率", "#9b59b6")  # 紫色
-        memory_layout.addWidget(self.memory_metric)
-        all_metrics_layout.addWidget(memory_group)
+        system_layout.addWidget(self.memory_metric)
+        
+        # 添加系统资源组到布局
+        all_metrics_layout.addWidget(system_group)
         
         # 创建GPU监控区域
         self.gpu_metrics_layout = QVBoxLayout()
@@ -289,50 +289,76 @@ class SystemMonitorTab(QWidget):
         
         # 计算总的GPU数量
         total_gpus = len(nvidia_gpus) + len(non_nvidia_gpus)
+        all_gpus = nvidia_gpus + non_nvidia_gpus
         
-        # 添加NVIDIA GPU信息
-        for i, gpu in enumerate(nvidia_gpus):
-            # 对于NVIDIA显卡，专用显存等于总显存，共享显存为0
-            dedicated_memory = self.custom_round(gpu.get('memory_total', 0))
-            shared_memory = 0
-            
-            # 根据GPU总数决定显示格式
-            if total_gpus == 1:
-                label_text = f"GPU: {gpu['name']} ({dedicated_memory} GB+{shared_memory} GB)"
+        # 如果有两个GPU，并排显示
+        if total_gpus == 2:
+            # 处理第一个GPU
+            gpu = all_gpus[0]
+            is_nvidia = gpu.get("driver", "").upper() == "NVIDIA"
+            if is_nvidia:
+                dedicated_memory = self.custom_round(gpu.get('memory_total', 0))
+                shared_memory = 0
             else:
-                label_text = f"GPU #{i+1}: {gpu['name']} ({dedicated_memory} GB+{shared_memory} GB)"
+                dedicated_memory = self.custom_round(gpu.get('dedicated', 0))
+                shared_memory = self.custom_round(gpu.get('shared', 0))
+            
+            label_text = f"GPU #1: {gpu['name']} ({dedicated_memory} GB+{shared_memory} GB)"
+            if not is_nvidia:
+                label_text += " [非NVIDIA]"
                 
             gpu_label = QLabel(label_text)
             gpu_label.setWordWrap(True)
-            self.gpu_info_layout.addWidget(gpu_label, current_row, 0, 1, 4)
+            self.gpu_info_layout.addWidget(gpu_label, current_row, 0, 1, 2)
             self.gpu_labels.append(gpu_label)
-            current_row += 1
-        
-        # 添加非NVIDIA GPU信息
-        for i, gpu in enumerate(non_nvidia_gpus):
-            # 获取专用显存和共享显存
-            dedicated_memory = self.custom_round(gpu.get('dedicated', 0))
-            shared_memory = self.custom_round(gpu.get('shared', 0))
             
-            # 根据GPU总数决定显示格式
-            if total_gpus == 1:
-                label_text = f"GPU: {gpu['name']} ({dedicated_memory} GB+{shared_memory} GB) [非NVIDIA]"
+            # 处理第二个GPU
+            gpu = all_gpus[1]
+            is_nvidia = gpu.get("driver", "").upper() == "NVIDIA"
+            if is_nvidia:
+                dedicated_memory = self.custom_round(gpu.get('memory_total', 0))
+                shared_memory = 0
             else:
-                label_text = f"GPU #{len(nvidia_gpus)+i+1}: {gpu['name']} ({dedicated_memory} GB+{shared_memory} GB) [非NVIDIA]"
+                dedicated_memory = self.custom_round(gpu.get('dedicated', 0))
+                shared_memory = self.custom_round(gpu.get('shared', 0))
+            
+            label_text = f"GPU #2: {gpu['name']} ({dedicated_memory} GB+{shared_memory} GB)"
+            if not is_nvidia:
+                label_text += " [非NVIDIA]"
                 
             gpu_label = QLabel(label_text)
             gpu_label.setWordWrap(True)
-            self.gpu_info_layout.addWidget(gpu_label, current_row, 0, 1, 4)
+            self.gpu_info_layout.addWidget(gpu_label, current_row, 2, 1, 2)
             self.gpu_labels.append(gpu_label)
+            
             current_row += 1
+        else:
+            # 单个GPU或超过两个GPU时使用原来的垂直显示逻辑
+            for i, gpu in enumerate(all_gpus):
+                is_nvidia = gpu.get("driver", "").upper() == "NVIDIA"
+                if is_nvidia:
+                    dedicated_memory = self.custom_round(gpu.get('memory_total', 0))
+                    shared_memory = 0
+                else:
+                    dedicated_memory = self.custom_round(gpu.get('dedicated', 0))
+                    shared_memory = self.custom_round(gpu.get('shared', 0))
+                
+                if total_gpus == 1:
+                    label_text = f"GPU: {gpu['name']} ({dedicated_memory} GB+{shared_memory} GB)"
+                else:
+                    label_text = f"GPU #{i+1}: {gpu['name']} ({dedicated_memory} GB+{shared_memory} GB)"
+                    
+                if not is_nvidia:
+                    label_text += " [非NVIDIA]"
+                    
+                gpu_label = QLabel(label_text)
+                gpu_label.setWordWrap(True)
+                self.gpu_info_layout.addWidget(gpu_label, current_row, 0, 1, 4)
+                self.gpu_labels.append(gpu_label)
+                current_row += 1
         
-        # 更新网络和版本信息的位置
-        current_row += 1
-        self.gpu_info_layout.addWidget(self.network_label, current_row, 0, 1, 4)
-        
-        # Python和Ollama版本
+        # Python版本
         self.python_label.setText(f"Python版本: {info.python_version}")
-        self.ollama_label.setText(f"Ollama版本: {info.ollama_version}")
         
         # 设置GPU监控
         gpu_vendors = []
@@ -366,6 +392,7 @@ class SystemMonitorTab(QWidget):
         # 创建GPU分组和监控指标
         self.gpu_metrics = []
         
+        # 对所有GPU使用垂直布局，每个GPU占一行
         for i, gpu in enumerate(gpu_info):
             # 检查是否为NVIDIA GPU
             is_nvidia = False
@@ -449,9 +476,6 @@ class SystemMonitorTab(QWidget):
                 memory_percent = (memory_used / memory_total * 100) if memory_total > 0 else 0
                 
                 gpu_metric["memory"].update_value(memory_percent)
-        
-        # 更新网络IO信息
-        self.network_label.setText(f"实时网速: 上传 {metrics.network_sent:.1f} KB/s | 下载 {metrics.network_recv:.1f} KB/s")
     
     def on_tab_selected(self):
         """标签页被选中时调用"""
@@ -460,9 +484,8 @@ class SystemMonitorTab(QWidget):
     
     def on_server_changed(self):
         """服务器连接更改时调用"""
-        # 更新Ollama版本信息
-        ollama_version = self.client.get_version()
-        self.ollama_label.setText(f"Ollama版本: {ollama_version}")
+        # 不再需要更新Ollama版本标签，因为它现在显示在状态栏中
+        pass
     
     def on_close(self):
         """应用程序关闭时调用"""

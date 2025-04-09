@@ -214,9 +214,8 @@ class SystemMonitor:
             Ollama版本字符串
         """
         try:
-            import requests
             version = self.ollama_client.get_version()
-            return version if version else "未知"
+            return version
         except Exception:
             return "未知"
     

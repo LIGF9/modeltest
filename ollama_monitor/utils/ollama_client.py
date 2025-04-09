@@ -191,7 +191,7 @@ class OllamaClient:
         except requests.RequestException:
             return False, 0
     
-    def get_version(self) -> Tuple[Optional[str], Optional[str]]:
+    def get_version(self) -> str:
         """
         获取Ollama版本信息
         
@@ -201,9 +201,10 @@ class OllamaClient:
         try:
             response = self.session.get(f"{self.base_url}/api/version")
             response.raise_for_status()
-            return (response.json().get("version", "未知"), None)
+            return response.json().get("version", "未知")
         except requests.RequestException as e:
-            return (None, str(e))
+            print(f"获取Ollama版本失败: {e}")
+            return "未知"
     
     def unload_model(self, model_name: str) -> bool:
         """
@@ -240,8 +241,8 @@ class OllamaClient:
     def check_parallel_support(self, version: Optional[str] = None) -> bool:
         """检查版本是否支持多实例并发"""
         if version is None:
-            version, err = self.get_version()
-            if err:
+            version = self.get_version()
+            if version == "未知":
                 return False
         try:
             return tuple(map(int, version.split('.'))) >= (0, 1, 33)

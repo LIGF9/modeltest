@@ -12,6 +12,8 @@ import asyncio
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime
+import random
+from functools import partial
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, 
@@ -361,6 +363,11 @@ class ChatTab(QWidget):
         self.stop_button.setEnabled(False)
         toolbar_layout.addWidget(self.stop_button)
         
+        # 状态标签
+        self.status_label = QLabel("就绪")
+        self.status_label.setStyleSheet("color: #27ae60;") # 绿色表示就绪
+        toolbar_layout.addWidget(self.status_label)
+        
         # 添加空白区域
         toolbar_layout.addStretch()
         
@@ -374,28 +381,40 @@ class ChatTab(QWidget):
         # 输入框
         self.input_box = QTextEdit()
         self.input_box.setPlaceholderText("在此输入您的问题...\n按Enter发送，Ctrl+Enter换行")
-        self.input_box.setMinimumHeight(80)
-        self.input_box.setMaximumHeight(150)
+        self.input_box.setMinimumHeight(75)  # 调整为适合三行文本的高度
+        self.input_box.setMaximumHeight(100)
         self.input_box.keyPressEvent = self._input_key_press
         input_layout.addWidget(self.input_box)
         
-        # 发送按钮和状态区域
-        send_area_layout = QHBoxLayout()
+        # 引导问题和发送按钮区域（合并到同一行）
+        bottom_area_layout = QHBoxLayout()
+        bottom_area_layout.setContentsMargins(5, 5, 5, 5)
         
-        # 状态标签
-        self.status_label = QLabel("就绪")
-        send_area_layout.addWidget(self.status_label)
+        # 提问引导标签
+        guide_label = QLabel("您可能想问：")
+        guide_label.setStyleSheet("color: #666666;")
+        bottom_area_layout.addWidget(guide_label)
         
-        # 添加空白区域
-        send_area_layout.addStretch()
+        # 创建四个动态引导按钮
+        self.guide_buttons = []
+        for i in range(4):  # 4个按钮
+            btn = QPushButton("")
+            btn.setStyleSheet("background-color: #f0f0f0; border: 1px solid #cccccc; border-radius: 4px; padding: 3px 8px; color: #555555;")
+            btn.setVisible(False)  # 初始状态下不可见
+            bottom_area_layout.addWidget(btn)
+            self.guide_buttons.append(btn)
+        
+        # 添加弹性空间，使发送按钮靠右
+        bottom_area_layout.addStretch()
         
         # 发送按钮
         self.send_button = QPushButton("发送")
         self.send_button.clicked.connect(self._send_message)
         self.send_button.setDefault(True)
-        send_area_layout.addWidget(self.send_button)
+        self.send_button.setMinimumWidth(80)  # 设置最小宽度
+        bottom_area_layout.addWidget(self.send_button)
         
-        input_layout.addLayout(send_area_layout)
+        input_layout.addLayout(bottom_area_layout)
         
         # 创建分隔器，允许调整聊天区域和输入区域的比例
         splitter = QSplitter(Qt.Orientation.Vertical)
@@ -415,6 +434,9 @@ class ChatTab(QWidget):
         self.scroll_timer = QTimer(self)
         self.scroll_timer.timeout.connect(self._auto_scroll)
         self.scroll_timer.setSingleShot(True)
+        
+        # 初始化引导按钮内容
+        self._update_initial_guide_buttons()
     
     def _input_key_press(self, event: QKeyEvent):
         """
@@ -464,6 +486,9 @@ class ChatTab(QWidget):
             content=content
         )
         self._add_message(message)
+        
+        # 更新引导按钮，确保即使只有系统消息也能显示引导按钮
+        self._update_initial_guide_buttons()
     
     def _add_user_message(self, content: str):
         """
@@ -609,7 +634,12 @@ class ChatTab(QWidget):
         参数:
             is_thinking: 是否正在思考
         """
-        self.status_label.setText("生成中..." if is_thinking else "就绪")
+        if is_thinking:
+            self.status_label.setText("生成中...")
+            self.status_label.setStyleSheet("color: #0066CC; font-weight: bold;") # 蓝色表示生成中
+        else:
+            self.status_label.setText("就绪")
+            self.status_label.setStyleSheet("color: #008800; font-weight: bold;") # 绿色表示就绪
     
     @pyqtSlot()
     def _handle_chat_completed(self):
@@ -619,6 +649,10 @@ class ChatTab(QWidget):
         self.send_button.setEnabled(True)
         self.stop_button.setEnabled(False)
         self.status_label.setText("就绪")
+        self.status_label.setStyleSheet("color: #008800; font-weight: bold;") # 绿色表示就绪
+        
+        # 更新引导按钮
+        self._update_guide_buttons()
         
         # 清除worker引用
         self.chat_worker = None
@@ -648,12 +682,14 @@ class ChatTab(QWidget):
         self.send_button.setEnabled(True)
         self.stop_button.setEnabled(False)
         self.status_label.setText("错误")
+        self.status_label.setStyleSheet("color: #CC0000; font-weight: bold;") # 红色表示错误
     
     def _stop_generation(self):
         """停止生成响应"""
         if self.chat_worker:
             self.chat_worker.stop()
             self.status_label.setText("正在停止...")
+            self.status_label.setStyleSheet("color: #FF6600; font-weight: bold;") # 橙色表示正在停止
     
     def _clear_chat(self):
         """清空聊天记录"""
@@ -725,4 +761,173 @@ class ChatTab(QWidget):
         """应用程序关闭时调用"""
         # 停止正在进行的请求
         if self.chat_worker:
-            self.chat_worker.stop() 
+            self.chat_worker.stop()
+    
+    def _fill_guide_text(self, text: str):
+        """
+        填充引导文本到输入框
+        
+        参数:
+            text: 引导文本
+        """
+        self.input_box.setText(text)
+        self.input_box.setFocus()
+        # 将光标移到文本末尾
+        cursor = self.input_box.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        self.input_box.setTextCursor(cursor)
+    
+    def _update_guide_buttons(self):
+        """根据聊天内容更新引导按钮"""
+        # 如果没有聊天历史，使用初始引导问题
+        if not self.messages:
+            self._update_initial_guide_buttons()
+            return
+        
+        # 获取最后一条助手消息的内容（如果存在）
+        last_assistant_message = ""
+        for msg in reversed(self.messages):
+            if msg["role"] == "assistant":
+                last_assistant_message = msg["content"]
+                break
+        
+        # 如果没有找到助手消息，使用初始引导问题
+        if not last_assistant_message:
+            self._update_initial_guide_buttons()
+            return
+            
+        # 根据最后一条助手消息内容生成可能的后续问题
+        suggested_questions = self._generate_follow_up_questions(last_assistant_message)
+        
+        # 更新按钮文本和可见性
+        for i, btn in enumerate(self.guide_buttons):
+            # 断开之前的所有连接
+            try:
+                btn.clicked.disconnect()
+            except TypeError:
+                # 如果没有连接的信号，会抛出TypeError
+                pass
+                
+            if i < len(suggested_questions):
+                question = suggested_questions[i]
+                btn.setText(question)
+                btn.setVisible(True)
+                # 创建点击事件处理函数
+                self._create_button_click_handler(btn, question)
+            else:
+                btn.setVisible(False)
+    
+    def _generate_follow_up_questions(self, assistant_message: str) -> list:
+        """
+        根据助手的回复生成后续可能的问题
+        
+        参数:
+            assistant_message: 助手的回复内容
+            
+        返回:
+            建议的问题列表，包含2个相关问题和2个拓展问题
+        """
+        # 话题相关问题集
+        topic_related_questions = []
+        
+        # 检测是否提到了概念或术语
+        if "概念" in assistant_message or "定义" in assistant_message or "术语" in assistant_message:
+            topic_related_questions.append("能详细解释一下这个概念吗？")
+        
+        # 检测是否提到了方法或步骤
+        if "方法" in assistant_message or "步骤" in assistant_message or "过程" in assistant_message:
+            topic_related_questions.append("这个方法有什么优缺点？")
+        
+        # 检测是否提到了代码
+        if "代码" in assistant_message or "程序" in assistant_message or "函数" in assistant_message:
+            topic_related_questions.append("能提供完整的代码示例吗？")
+        
+        # 检测是否提到了多个选项
+        if "可以" in assistant_message or "或者" in assistant_message or "另一种" in assistant_message:
+            topic_related_questions.append("哪种方法最适合我的情况？")
+        
+        # 检测是否提到了问题或错误
+        if "问题" in assistant_message or "错误" in assistant_message or "异常" in assistant_message:
+            topic_related_questions.append("如何解决这个问题？")
+        
+        # 检测是否提到了最佳实践
+        if "最佳实践" in assistant_message or "建议" in assistant_message or "推荐" in assistant_message:
+            topic_related_questions.append("为什么这是最佳实践？")
+        
+        # 默认话题相关问题（如果分析不出合适问题，使用这些）
+        default_related_questions = [
+            "能详细解释一下吗？",
+            "还有其他方法吗？", 
+            "请给出一个实际例子",
+            "这个有什么应用场景？",
+            "这个技术的优势是什么？",
+            "有没有需要注意的问题？"
+        ]
+        
+        # 话题拓展问题集
+        expansion_questions = [
+            "这与其他领域有什么联系？",
+            "这个技术的发展历史是怎样的？",
+            "未来这个领域可能有什么新趋势？",
+            "初学者应该如何入门这个领域？",
+            "有没有推荐的学习资源？",
+            "这个知识在实际工作中如何应用？",
+            "这个领域有哪些常见的误区？",
+            "相比其他方案，这个方法有什么独特之处？",
+            "这个技术背后的原理是什么？",
+            "这个方法如何与其他技术结合使用？"
+        ]
+        
+        # 确保有足够的话题相关问题
+        if len(topic_related_questions) < 2:
+            # 从默认问题中补充
+            remaining = set(default_related_questions) - set(topic_related_questions)
+            topic_related_questions.extend(random.sample(list(remaining), min(2 - len(topic_related_questions), len(remaining))))
+        
+        # 选择最终的2个话题相关问题
+        related_questions = random.sample(topic_related_questions, min(2, len(topic_related_questions)))
+        
+        # 选择2个话题拓展问题
+        expansion_selected = random.sample(expansion_questions, 2)
+        
+        # 组合所有问题（先相关问题，后拓展问题）
+        all_questions = related_questions + expansion_selected
+        
+        return all_questions
+    
+    def _update_initial_guide_buttons(self):
+        """更新初始引导按钮，显示开放性问题"""
+        # 开放性引导问题
+        initial_questions = [
+            "我想了解人工智能的基础知识",
+            "请介绍一下大语言模型的工作原理",
+            "你能帮我解决什么问题？",
+            "如何使用Python进行数据分析？"
+        ]
+        
+        # 更新按钮文本和可见性
+        for i, btn in enumerate(self.guide_buttons):
+            # 断开之前的所有连接
+            try:
+                btn.clicked.disconnect()
+            except TypeError:
+                # 如果没有连接的信号，会抛出TypeError
+                pass
+                
+            question = initial_questions[i]
+            btn.setText(question)
+            btn.setVisible(True)
+            # 创建点击事件处理函数
+            self._create_button_click_handler(btn, question)
+    
+    def _create_button_click_handler(self, button, question_text):
+        """
+        为按钮创建点击事件处理函数
+        
+        参数:
+            button: 按钮控件
+            question_text: 问题文本
+        """
+        # 使用functools.partial解决闭包问题
+        handler = partial(self._fill_guide_text, question_text)
+        button.clicked.connect(handler) 
