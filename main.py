@@ -8,9 +8,19 @@ Ollama模型监控测试工具 - 主入口文件
 import sys
 import os
 from datetime import datetime
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QMessageBox
+from PyQt6.QtGui import QIcon
+from qtpy.QtCore import QSharedMemory
 from ollama_monitor.ui.main_window import MainWindow
 
+def is_already_running():
+    """检查是否已有实例在运行"""
+    shared_mem = QSharedMemory("YourUniqueAppKey")  # 替换为你的唯一标识
+    if shared_mem.attach():
+        return True
+    if not shared_mem.create(1):
+        return True
+    return False
 
 def main():
     """主函数，应用程序入口点"""
@@ -21,8 +31,15 @@ def main():
     # 确保资源目录存在
     os.makedirs(os.path.join(os.path.dirname(__file__), 'ollama_monitor', 'resources'), exist_ok=True)
     
+    if is_already_running():
+        QMessageBox.warning(None, "警告", "程序已在运行！")
+        sys.exit(1)
+
     # 创建应用程序
     app = QApplication(sys.argv)
+    
+    # 可选：同时设置应用程序图标（影响任务栏图标）
+    app.setWindowIcon(QIcon("ollamaIcon.ico"))
     
     # 设置应用程序样式
     app.setStyle("Fusion")

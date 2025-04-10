@@ -38,6 +38,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Ollama 模型监控测试工具")
         self.resize(1000, 700)
         
+        # 设置窗口图标
+        self.setWindowIcon(QIcon("ollamaIcon.ico")) 
+        
         # 初始化客户端和监控器
         self.ollama_client = OllamaClient()
         self.system_monitor = SystemMonitor()
