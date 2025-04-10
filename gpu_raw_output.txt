@@ -1,0 +1,14 @@
+Name               : OrayIddDriver Device
+AdapterRAM         : 
+SharedSystemMemory : 
+VideoMemoryType    : 2
+
+Name               : Radeon 540X Series
+AdapterRAM         : 2147483648
+SharedSystemMemory : 
+VideoMemoryType    : 2
+
+Name               : Intel(R) UHD Graphics 620
+AdapterRAM         : 1073741824
+SharedSystemMemory : 
+VideoMemoryType    : 2

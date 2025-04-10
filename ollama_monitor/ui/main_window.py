@@ -6,13 +6,10 @@
 定义应用程序的主窗口和界面布局
 """
 
-import os
-import sys
 from datetime import datetime
 from PyQt6.QtWidgets import (
     QMainWindow, QTabWidget, QComboBox, QToolBar, 
-    QLabel, QPushButton, QWidget, QVBoxLayout, 
-    QHBoxLayout, QStatusBar, QMessageBox, QFileDialog,
+    QLabel, QPushButton, QWidget, QVBoxLayout, QStatusBar, QMessageBox,
     QSizePolicy, QDialog
 )
 from PyQt6.QtCore import Qt, QTimer, QSize
