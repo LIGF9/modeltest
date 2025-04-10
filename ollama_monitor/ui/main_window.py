@@ -181,6 +181,11 @@ class MainWindow(QMainWindow):
     
     def _load_models(self):
         """加载Ollama模型列表"""
+        
+        if self.performance_tab.istesting:
+            QMessageBox.warning(self, "测试中", "正在进行性能测试，请手动停止测试，或等待测试结束后再试。")
+            return
+
         try:
             # 保存当前选择的模型
             current_model = self.model_combo.currentText()
@@ -229,24 +234,29 @@ class MainWindow(QMainWindow):
         参数:
             model_name: 选择的模型名称
         """
+
+        if self.performance_tab.istesting:
+            QMessageBox.warning(self, "测试中", "正在进行性能测试，请手动停止测试，或等待测试结束后再试。")
+            return
+
         if model_name and model_name not in ["加载中...", "未找到模型", "加载失败"]:
             self._update_active_model()
     
     def _update_active_model(self):
         """更新当前选择的模型到所有标签页"""
         model_name = self.model_combo.currentText()
-        if model_name and model_name not in ["加载中...", "未找到模型", "加载失败"]:
-            try:
-                # 更新聊天标签页的模型
-                if hasattr(self, 'chat_tab') and self.chat_tab is not None:
-                    self.chat_tab.set_model(model_name)
+        try:
+            # 更新聊天标签页的模型
+            if hasattr(self, 'chat_tab') and self.chat_tab is not None:
+                self.chat_tab.set_model(model_name)
+            
+            # 更新性能测试标签页的模型
+            if hasattr(self, 'performance_tab') and self.performance_tab is not None:
+                self.performance_tab.set_model(model_name)
                 
-                # 更新性能测试标签页的模型
-                if hasattr(self, 'performance_tab') and self.performance_tab is not None:
-                    self.performance_tab.set_model(model_name)
-            except RuntimeError as e:
-                # 忽略已删除对象的错误
-                print(f"更新模型时出错: {e}")
+        except RuntimeError as e:
+            # 忽略已删除对象的错误
+            print(f"更新模型时出错: {e}")
     
     def _on_server_changed(self, server_url):
         """
@@ -259,7 +269,6 @@ class MainWindow(QMainWindow):
         pass
     
     def _on_connect_clicked(self):
-        # print("self.performance_tab.istesting:",self.performance_tab.istesting)
         if self.performance_tab.istesting:
             QMessageBox.warning(self, "测试中", "正在进行性能测试，请手动停止测试，或等待测试结束后再试。")
             return

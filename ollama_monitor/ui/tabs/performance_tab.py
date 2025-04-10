@@ -533,7 +533,7 @@ class PerformanceTab(QWidget):
         self.temperature_input = QLineEdit()
         self.temperature_input.setPlaceholderText("例如: 0.8")
         self.temperature_input.setText("0.8")  # 设置默认值
-        self.temperature_input.setMaximumWidth(120)
+        self.temperature_input.setMaximumWidth(100)
         # 设置焦点策略为ClickFocus
         self.temperature_input.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         results_layout.addWidget(self.temperature_input, 2, 4)
@@ -545,7 +545,7 @@ class PerformanceTab(QWidget):
         self.context_window_input = QLineEdit()
         self.context_window_input.setPlaceholderText("例如: 128K")
         self.context_window_input.setText("128K")  # 设置默认值为128K
-        self.context_window_input.setMaximumWidth(120)
+        self.context_window_input.setMaximumWidth(100)
         # 设置焦点策略为ClickFocus
         self.context_window_input.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         results_layout.addWidget(self.context_window_input, 2, 7)
@@ -842,12 +842,11 @@ class PerformanceTab(QWidget):
             model_name = self.current_model
             test_params['model_name'] = model_name
 
-            # 设置进度条最大值为总测试轮次数（并发用户数 * 轮次数）
-            total_rounds = rounds * concurrent_users
-            self.progress_bar.setStyleSheet("QProgressBar { font-weight: bold; }")
-            self.progress_bar.setMaximum(total_rounds)
-            self.progress_bar.setValue(0)
-            self.progress_bar.setFormat("0/%d" % total_rounds)
+            # 更新操作状态文字和样式 - 同步更新避免状态延迟
+            self._safe_access('operation_status', lambda x: {
+                x.setText("模型载入测试中..."),
+                x.setStyleSheet("font-weight: bold; color: #3498db;")
+            })
             
             # 禁用相关按钮
             self._safe_access('start_btn', lambda x: {
@@ -860,12 +859,13 @@ class PerformanceTab(QWidget):
             })
             self._safe_access('export_html_btn', lambda x: x.setEnabled(False))
             self._safe_access('export_txt_btn', lambda x: x.setEnabled(False))
-            
-            # 更新操作状态文字和样式 - 同步更新避免状态延迟
-            self._safe_access('operation_status', lambda x: {
-                x.setText("模型载入测试中..."),
-                x.setStyleSheet("font-weight: bold; color: #3498db;")
-            })
+
+            # 设置进度条最大值为总测试轮次数（并发用户数 * 轮次数）
+            total_rounds = rounds * concurrent_users
+            self.progress_bar.setStyleSheet("QProgressBar { font-weight: bold; }")
+            self.progress_bar.setMaximum(total_rounds)
+            self.progress_bar.setValue(0)
+            self.progress_bar.setFormat("0/%d" % total_rounds)
 
             # 获取模型参数
             model_params_input = self._safe_access('parameters_input', lambda x: x.text())
@@ -1261,7 +1261,7 @@ class PerformanceTab(QWidget):
         self.animation_offset += 0.1
         if self.animation_offset > 1.0:
             self.animation_offset = 0.0
-    
+
     @pyqtSlot(int, int)
     def _handle_progress_updated(self, completed, total):
         """
@@ -1857,6 +1857,9 @@ class PerformanceTab(QWidget):
         参数:
             model_name: 模型名称
         """
+        current_model = self.current_report.test_params["model_name"] if self.current_report else None 
+        if current_model and current_model!=model_name:
+            return
         # 直接设置当前模型名称，不再需要更新下拉框
         self.current_model = model_name
     
@@ -1872,6 +1875,7 @@ class PerformanceTab(QWidget):
                 
                 # 将焦点设置回窗口本身，防止参数输入框获得焦点
                 self.setFocus()
+
         except RuntimeError:
             # 忽略已删除对象的错误
             pass
@@ -1925,6 +1929,18 @@ class PerformanceTab(QWidget):
             self._safe_access('operation_status', lambda x: x.setText("就绪"))
             self._safe_access('operation_status', lambda x: x.setStyleSheet("font-weight: normal; color: black;"))
             
+            # 重置进度条
+            progress_bar = self._safe_access('progress_bar')
+            test_round_input = self._safe_access('rounds_spin')
+            rounds = int(test_round_input.value())
+            concurrency_input = self._safe_access('concurrency_spin')
+            concurrent_users = int(concurrency_input.value())
+            if progress_bar:
+                progress_bar.setStyleSheet("QProgressBar { font-weight: bold; }")
+                progress_bar.setValue(0)
+                progress_bar.setFormat(f"0/{rounds*concurrent_users}")
+                progress_bar.setStyleSheet("")
+
         except Exception as e:
             # 可能是在对象已销毁的情况下尝试访问
             print(f"服务器更改重置UI时错误: {e}")
