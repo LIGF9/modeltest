@@ -68,9 +68,7 @@ class MessageBubble(QFrame):
         
         # 添加角色标签（仅系统消息显示）
         if message.role == 'system':
-            role_label = QLabel("系统")
-            role_label.setStyleSheet("font-weight: bold; color: #666;")
-            main_layout.addWidget(role_label)
+            message.content = "系统："+message.content
         
         # 添加内容
         content = QLabel(message.content)
@@ -328,7 +326,7 @@ class ChatTab(QWidget):
         """初始化UI元素"""
         # 主布局
         main_layout = QVBoxLayout(self)
-        main_layout.setSpacing(10)
+        main_layout.setSpacing(5)
         
         # 创建上部聊天区域
         chat_area = QScrollArea()
@@ -339,15 +337,15 @@ class ChatTab(QWidget):
         self.chat_container = QWidget()
         self.chat_layout = QVBoxLayout(self.chat_container)
         self.chat_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        self.chat_layout.setSpacing(15)
-        self.chat_layout.setContentsMargins(10, 10, 10, 10)
+        self.chat_layout.setSpacing(10)
+        self.chat_layout.setContentsMargins(5,5,5,5)
         
         chat_area.setWidget(self.chat_container)
         
         # 创建底部输入区域
         input_area = QWidget()
         input_layout = QVBoxLayout(input_area)
-        input_layout.setContentsMargins(0, 5, 0, 0)
+        input_layout.setContentsMargins(0, 0, 0, 0)
         
         # 工具栏
         toolbar_layout = QHBoxLayout()
@@ -364,7 +362,7 @@ class ChatTab(QWidget):
         toolbar_layout.addWidget(self.stop_button)
         
         # 状态标签
-        self.status_label = QLabel("就绪")
+        self.status_label = QLabel("模型准备就绪")
         self.status_label.setStyleSheet("color: #27ae60;") # 绿色表示就绪
         toolbar_layout.addWidget(self.status_label)
         
@@ -381,7 +379,7 @@ class ChatTab(QWidget):
         # 输入框
         self.input_box = QTextEdit()
         self.input_box.setPlaceholderText("在此输入您的问题...\n按Enter发送，Ctrl+Enter换行")
-        self.input_box.setMinimumHeight(75)  # 调整为适合三行文本的高度
+        self.input_box.setMinimumHeight(25)  # 调整为适合三行文本的高度
         self.input_box.setMaximumHeight(100)
         self.input_box.keyPressEvent = self._input_key_press
         input_layout.addWidget(self.input_box)
@@ -422,7 +420,7 @@ class ChatTab(QWidget):
         splitter.addWidget(input_area)
         
         # 设置初始大小比例
-        splitter.setSizes([700, 300])
+        splitter.setSizes([700, 200])
         
         # 添加到主布局
         main_layout.addWidget(splitter)
@@ -636,10 +634,10 @@ class ChatTab(QWidget):
         """
         if is_thinking:
             self.status_label.setText("生成中...")
-            self.status_label.setStyleSheet("color: #0066CC; font-weight: bold;") # 蓝色表示生成中
+            self.status_label.setStyleSheet("color: #0066CC;") # 蓝色表示生成中
         else:
-            self.status_label.setText("就绪")
-            self.status_label.setStyleSheet("color: #008800; font-weight: bold;") # 绿色表示就绪
+            self.status_label.setText("模型准备就绪")
+            self.status_label.setStyleSheet("color: #27ae60;") # 绿色表示就绪
     
     @pyqtSlot()
     def _handle_chat_completed(self):
@@ -648,8 +646,8 @@ class ChatTab(QWidget):
         self.input_box.setEnabled(True)
         self.send_button.setEnabled(True)
         self.stop_button.setEnabled(False)
-        self.status_label.setText("就绪")
-        self.status_label.setStyleSheet("color: #008800; font-weight: bold;") # 绿色表示就绪
+        self.status_label.setText("模型准备就绪")
+        self.status_label.setStyleSheet("color: #27ae60;") # 绿色表示就绪
         
         # 更新引导按钮
         self._update_guide_buttons()

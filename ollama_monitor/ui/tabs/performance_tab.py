@@ -38,7 +38,7 @@ class ClickableLabel(QLabel):
     def __init__(self, text, parent=None):
         super().__init__(text, parent)
         self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))  # 设置鼠标样式为手型
-        self.setStyleSheet("color: #3498db; font-weight: bold;")
+        # self.setStyleSheet("color: #3498db; font-weight: bold;")
         
     def mousePressEvent(self, event: QMouseEvent):
         """处理鼠标点击事件"""
@@ -354,7 +354,7 @@ class PerformanceTab(QWidget):
         title_layout = QHBoxLayout()
         title = QLabel("模型性能测试")
         title.setStyleSheet("font-size: 18px; font-weight: bold;")
-        description = QLabel("使用不同类型的提示词测试模型性能并生成详细报告")
+        description = QLabel("使用不同类型的提示词测试模型生成速度并提供详细报告")
         description.setStyleSheet("color: #666;")
         title_layout.addWidget(title)
         title_layout.addWidget(description)
@@ -416,7 +416,7 @@ class PerformanceTab(QWidget):
 
         # 在进度条右侧添加操作状态
         self.operation_status = QLabel("未开始测试")
-        self.operation_status.setStyleSheet("font-weight: bold; color: #7f8c8d;")
+        self.operation_status.setStyleSheet("color: #7f8c8d;")
         self.operation_status.setMinimumWidth(120)  # 设置最小宽度确保文本显示
         self.operation_status.setMaximumWidth(150)  # 设置最大宽度限制空间占用
         left_layout.addWidget(self.operation_status, 1)  # 操作状态占较少空间
@@ -521,7 +521,7 @@ class PerformanceTab(QWidget):
         self.precision_input = QLineEdit()
         self.precision_input.setPlaceholderText("例如: INT8、FP16")
         self.precision_input.setText("INT4")  # 设置默认值为INT8
-        self.precision_input.setMaximumWidth(120)
+        self.precision_input.setMaximumWidth(100)
         # 设置焦点策略为ClickFocus
         self.precision_input.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         results_layout.addWidget(self.precision_input, 2, 1)
@@ -814,7 +814,6 @@ class PerformanceTab(QWidget):
         self.istesting = True
 
         try:
-            print("开始测试，istesting：", self.istesting)
             # 清空详情表格并初始化测试结果
             self._init_test_results(reset_input_values=False)
             
@@ -842,6 +841,31 @@ class PerformanceTab(QWidget):
                 return
             model_name = self.current_model
             test_params['model_name'] = model_name
+
+            # 设置进度条最大值为总测试轮次数（并发用户数 * 轮次数）
+            total_rounds = rounds * concurrent_users
+            self.progress_bar.setStyleSheet("QProgressBar { font-weight: bold; }")
+            self.progress_bar.setMaximum(total_rounds)
+            self.progress_bar.setValue(0)
+            self.progress_bar.setFormat("0/%d" % total_rounds)
+            
+            # 禁用相关按钮
+            self._safe_access('start_btn', lambda x: {
+                x.setEnabled(False),
+                x.setStyleSheet("background-color: #cccccc; color: #888888; font-weight: bold; border-radius: 4px; padding: 4px;")
+            })
+            self._safe_access('stop_btn', lambda x: {
+                x.setText("停止测试"),
+                x.setStyleSheet("color: #e74c3c; font-weight: bold; border: 1px solid #e74c3c; border-radius: 4px; padding: 4px;")
+            })
+            self._safe_access('export_html_btn', lambda x: x.setEnabled(False))
+            self._safe_access('export_txt_btn', lambda x: x.setEnabled(False))
+            
+            # 更新操作状态文字和样式 - 同步更新避免状态延迟
+            self._safe_access('operation_status', lambda x: {
+                x.setText("模型载入测试中..."),
+                x.setStyleSheet("font-weight: bold; color: #3498db;")
+            })
 
             # 获取模型参数
             model_params_input = self._safe_access('parameters_input', lambda x: x.text())
@@ -891,33 +915,6 @@ class PerformanceTab(QWidget):
                 except ValueError:
                     QMessageBox.warning(self, "参数错误", "上下文窗口必须为有效数字，可带K/M后缀")
                     return
-            
-            # 计算总测试次数
-            total_tests = rounds * concurrent_users
-            
-            # 设置进度条最大值为总测试轮次数（并发用户数 * 轮次数）
-            total_rounds = self.concurrency_spin.value() * self.rounds_spin.value()
-            self.progress_bar.setMaximum(total_rounds)
-            self.progress_bar.setValue(0)
-            self.progress_bar.setFormat("0/%d" % total_rounds)
-            
-            # 禁用相关按钮
-            self._safe_access('start_btn', lambda x: {
-                x.setEnabled(False),
-                x.setStyleSheet("background-color: #cccccc; color: #888888; font-weight: bold; border-radius: 4px; padding: 4px;")
-            })
-            self._safe_access('stop_btn', lambda x: {
-                x.setText("停止测试"),
-                x.setStyleSheet("color: #e74c3c; font-weight: bold; border: 1px solid #e74c3c; border-radius: 4px; padding: 4px;")
-            })
-            self._safe_access('export_html_btn', lambda x: x.setEnabled(False))
-            self._safe_access('export_txt_btn', lambda x: x.setEnabled(False))
-            
-            # 更新操作状态文字和样式 - 同步更新避免状态延迟
-            self._safe_access('operation_status', lambda x: {
-                x.setText("模型载入测试中..."),
-                x.setStyleSheet("font-weight: bold; color: #3498db;")
-            })
                         
             # 初始化测试报告
             self.current_report = PerformanceReport(
@@ -962,8 +959,6 @@ class PerformanceTab(QWidget):
                 x.setText("测试失败"),
                 x.setStyleSheet("font-weight: bold; color: #e74c3c;")
             })
-
-        self.istesting = False
 
     def _stop_test(self):
         """停止/暂停性能测试"""
@@ -1138,8 +1133,8 @@ class PerformanceTab(QWidget):
                 self._safe_access('temperature_input', lambda x: x.setText("0.8"))
                 self._safe_access('context_window_input', lambda x: x.setText("128K"))
             
-            # 重置操作状态
-            self._safe_access('operation_status', lambda x: x.setStyleSheet("font-weight: normal; color: black;"))
+            # # 重置操作状态
+            # self._safe_access('operation_status', lambda x: x.setStyleSheet("font-weight: normal; color: black;"))
             
             # 禁用导出按钮
             self._safe_access('export_html_btn', lambda x: x.setEnabled(False))
@@ -1150,76 +1145,7 @@ class PerformanceTab(QWidget):
         
         except Exception as e:
             print(f"初始化测试结果UI时错误: {e}")
-    
-    @pyqtSlot(object)
-    def _handle_test_completed(self, report):
-        """
-        处理测试完成信号
-        
-        参数:
-            report: 性能测试报告
-        """
-        try:
-            # 判断是否为提前停止的测试
-            was_cancelled = False
-            if hasattr(report, 'test_params') and report.test_params.get('cancelled', False):
-                was_cancelled = True
-                
-            # 记录是否暂停完成
-            was_paused = False
-            if hasattr(report, 'test_params') and report.test_params.get('paused', False):
-                was_paused = True
-            
-            # 更新UI状态
-            self._safe_access('start_btn', lambda x: {
-                x.setEnabled(True),
-                x.setStyleSheet("background-color: #2980b9; color: white; font-weight: bold; border-radius: 4px; padding: 4px;")
-            })
-            self._safe_access('stop_btn', lambda x: {
-                x.setEnabled(False),
-                x.setStyleSheet("background-color: #cccccc; color: #888888; font-weight: bold; border: 1px solid #cccccc; border-radius: 4px; padding: 4px;")
-            })
-            self._safe_access('continue_btn', lambda x: x.setEnabled(False))
-            
-            # 根据测试结果更新状态文本
-            if was_cancelled:
-                self._safe_access('operation_status', lambda x: x.setText("测试已取消"))
-                self._safe_access('operation_status', lambda x: x.setStyleSheet("font-weight: bold; color: #e74c3c;"))
-            elif was_paused:
-                self._safe_access('operation_status', lambda x: x.setText("测试已暂停"))
-                self._safe_access('operation_status', lambda x: x.setStyleSheet("font-weight: bold; color: #f39c12;"))
-            else:
-                self._safe_access('operation_status', lambda x: x.setText("测试完成"))
-                self._safe_access('operation_status', lambda x: x.setStyleSheet("font-weight: bold; color: #27ae60;"))
-            
-            # 保存报告引用
-            self.current_report = report
-            
-            # 启用报告导出和管理按钮
-            self._safe_access('export_html_btn', lambda x: x.setEnabled(True))
-            self._safe_access('export_txt_btn', lambda x: x.setEnabled(True))
-            
-            # 强制更新测试概述
-            details_table = self._safe_access('details_table')
-            if details_table:
-                self._update_test_summary(details_table)
-            
-            # 停止测试动画
-            self.is_testing = False
-            progress_timer = self._safe_access('progress_timer')
-            if progress_timer and progress_timer.isActive():
-                progress_timer.stop()
-                
-            # 恢复进度条默认样式
-            self._safe_access('progress_bar', lambda x: x.setStyleSheet(""))
-            
-            # 移除对不存在方法的调用，不需要状态栏刷新
-            # self._update_status_bar()
-            
-        except Exception as e:
-            print(f"处理测试完成信号时错误: {e}")
-            traceback.print_exc()
-    
+
     def _calculate_model_load_time(self):
         """计算模型载入时间并实时更新显示"""
         try:
@@ -1297,7 +1223,7 @@ class PerformanceTab(QWidget):
                 if self.current_report is not None:
                     # 保存为秒
                     self.current_report.test_params['model_load_time'] = model_load_time_s
-                    print(f"更新模型载入时间: {model_load_time_s:.2f} s")
+                    # print(f"更新模型载入时间: {model_load_time_s:.2f} s")
                     
         except Exception as e:
             print(f"计算模型载入时间错误: {e}")
@@ -1355,13 +1281,6 @@ class PerformanceTab(QWidget):
                 # 确保进度条显示的格式始终正确
                 progress_bar.setFormat(f"{completed}/{total}")
                 
-            # 当第0轮完成时更新状态文字（第一轮测试开始）
-            if completed == 0 and total > 0:
-                self._safe_access('operation_status', lambda x: {
-                    x.setText("正在进行轮次测试..."),
-                    x.setStyleSheet("font-weight: bold; color: #27ae60;")
-                })
-                
         except Exception as e:
             print(f"处理进度更新时错误: {e}")
     
@@ -1382,6 +1301,11 @@ class PerformanceTab(QWidget):
                 
             # 如果是第0轮测试，暂时将它的首token延迟显示为模型载入时间
             if round_num == "0":
+                # 更新文字和样式
+                self._safe_access('operation_status', lambda x: {
+                    x.setText("正在进行轮次测试..."),
+                    x.setStyleSheet("font-weight: bold; color: #27ae60;")
+                })
                 # 更新模型载入时间标签为第0轮的首token延迟时间（转换为秒）
                 model_load_time_s = result.first_token_latency / 1000.0
                 self._safe_access('model_load_time_label', lambda x: x.setText(f"{model_load_time_s:.2f} s"))
@@ -1393,11 +1317,7 @@ class PerformanceTab(QWidget):
             # 存储第一轮测试结果，用于后续计算
             if round_num == "1":
                 self.first_round_result = result
-                # 当开始正式轮次测试时更新状态文字
-                self._safe_access('operation_status', lambda x: {
-                    x.setText("正在进行轮次测试..."),
-                    x.setStyleSheet("font-weight: bold; color: #27ae60;")
-                })
+
                 
             # 转换总时间（毫秒->秒）
             total_time_seconds = result.total_time / 1000
@@ -1628,7 +1548,102 @@ class PerformanceTab(QWidget):
             print(f"处理轮次完成信号时错误: {e}")
             import traceback
             traceback.print_exc()
+
+    @pyqtSlot(str)
+    def _handle_test_error(self, error_message):
+        """
+        处理测试错误事件
+        
+        参数:
+            error_message: 错误消息
+        """
+        # 恢复UI状态
+        self._safe_access('start_btn', lambda x: x.setEnabled(True))
+        self._safe_access('stop_btn', lambda x: x.setEnabled(False))
+        
+        # 停止测试状态
+        self.is_testing = False
+        progress_timer = self._safe_access('progress_timer')
+        if progress_timer and progress_timer.isActive():
+            progress_timer.stop()
+        
+        # 恢复进度条默认样式
+        self._safe_access('progress_bar', lambda x: x.setStyleSheet(""))
+        
+        # 更新操作状态
+        self._safe_access('operation_status', lambda x: x.setText("测试错误"))
+        self._safe_access('operation_status', lambda x: x.setStyleSheet("font-weight: bold; color: #e74c3c;"))
+        
+        # 显示错误消息
+        QMessageBox.critical(self, "测试错误", error_message)
     
+    @pyqtSlot(object)
+    def _handle_test_completed(self, report):
+        """
+        处理测试完成信号
+        
+        参数:
+            report: 性能测试报告
+        """
+        try:
+            # 判断是否为提前停止的测试
+            was_cancelled = False
+            if hasattr(report, 'test_params') and report.test_params.get('cancelled', False):
+                was_cancelled = True
+                
+            # 记录是否暂停完成
+            was_paused = False
+            if hasattr(report, 'test_params') and report.test_params.get('paused', False):
+                was_paused = True
+            
+            # 更新UI状态
+            self._safe_access('start_btn', lambda x: {
+                x.setEnabled(True),
+                x.setStyleSheet("background-color: #2980b9; color: white; font-weight: bold; border-radius: 4px; padding: 4px;")
+            })
+            self._safe_access('stop_btn', lambda x: {
+                x.setEnabled(False),
+                x.setStyleSheet("background-color: #cccccc; color: #888888; font-weight: bold; border: 1px solid #cccccc; border-radius: 4px; padding: 4px;")
+            })
+            self._safe_access('continue_btn', lambda x: x.setEnabled(False))
+            
+            # 根据测试结果更新状态文本
+            if was_cancelled:
+                self._safe_access('operation_status', lambda x: x.setText("测试已取消"))
+                self._safe_access('operation_status', lambda x: x.setStyleSheet("font-weight: bold; color: #e74c3c;"))
+            elif was_paused:
+                self._safe_access('operation_status', lambda x: x.setText("测试已暂停"))
+                self._safe_access('operation_status', lambda x: x.setStyleSheet("font-weight: bold; color: #f39c12;"))
+            else:
+                self._safe_access('operation_status', lambda x: x.setText("测试完成"))
+                self._safe_access('operation_status', lambda x: x.setStyleSheet("font-weight: bold; color: #27ae60;"))
+            
+            # 保存报告引用
+            self.current_report = report
+            
+            # 启用报告导出和管理按钮
+            self._safe_access('export_html_btn', lambda x: x.setEnabled(True))
+            self._safe_access('export_txt_btn', lambda x: x.setEnabled(True))
+            
+            # 强制更新测试概述
+            details_table = self._safe_access('details_table')
+            if details_table:
+                self._update_test_summary(details_table)
+            
+            # 停止测试动画
+            self.is_testing = False
+            progress_timer = self._safe_access('progress_timer')
+            if progress_timer and progress_timer.isActive():
+                progress_timer.stop()
+                
+            # 恢复进度条默认样式
+            self._safe_access('progress_bar', lambda x: x.setStyleSheet(""))
+            self.istesting = False
+            
+        except Exception as e:
+            print(f"处理测试完成信号时错误: {e}")
+            traceback.print_exc()
+
     def _update_test_summary(self, details_table):
         """
         更新测试结果概述
@@ -1750,39 +1765,12 @@ class PerformanceTab(QWidget):
                                     lambda x: x.setStyleSheet("font-weight: bold; color: #c0392b;"))
                 
                 # 更新操作状态和性能评级标签
-                self._safe_access('operation_status', lambda x: x.setText(rating))
+                self._safe_access('operation_status', lambda x: x.setText("测试完成"))
                 self._safe_access('performance_rating_label', lambda x: x.setText(rating))
+
         except Exception as e:
             print(f"更新测试结果概述时错误: {e}")
-    
-    @pyqtSlot(str)
-    def _handle_test_error(self, error_message):
-        """
-        处理测试错误事件
-        
-        参数:
-            error_message: 错误消息
-        """
-        # 恢复UI状态
-        self._safe_access('start_btn', lambda x: x.setEnabled(True))
-        self._safe_access('stop_btn', lambda x: x.setEnabled(False))
-        
-        # 停止测试状态
-        self.is_testing = False
-        progress_timer = self._safe_access('progress_timer')
-        if progress_timer and progress_timer.isActive():
-            progress_timer.stop()
-        
-        # 恢复进度条默认样式
-        self._safe_access('progress_bar', lambda x: x.setStyleSheet(""))
-        
-        # 更新操作状态
-        self._safe_access('operation_status', lambda x: x.setText("测试错误"))
-        self._safe_access('operation_status', lambda x: x.setStyleSheet("font-weight: bold; color: #e74c3c;"))
-        
-        # 显示错误消息
-        QMessageBox.critical(self, "测试错误", error_message)
-        
+      
     def _export_html_report(self):
         """预览HTML格式的测试报告"""
         self.update_parameters()
@@ -1852,8 +1840,7 @@ class PerformanceTab(QWidget):
             temperature_input = self.temperature_input.text()
         if hasattr(self, 'context_window_input') and self.context_window_input is not None:
             context_window_input = self.context_window_input.text()
-        print("当前报告参数:", self.current_report.test_params)
-        print("更新参数:", model_params, precision_input, temperature_input, context_window_input)
+            
         # 更新当前报告的测试参数
         test_params = self.current_report.test_params 
         test_params['model_params'] = model_params
@@ -1862,7 +1849,6 @@ class PerformanceTab(QWidget):
         test_params['context_window'] = context_window_input
         # 更新当前报告的测试参数
         self.current_report.test_params = test_params
-        print("更新后报告参数:", self.current_report.test_params)
 
     def set_model(self, model_name: str):
         """
@@ -2015,16 +2001,11 @@ class PerformanceTestWorker(QThread):
         # 保存原始并发配置，以便测试结束后恢复
         self.original_parallel_config = None
         self.parallel_modified = False
-    
-    def cancel_test(self):
-        """取消测试"""
-        self.is_cancelled = True
-        print("测试取消请求已提交 - 等待当前任务完成后停止测试")
-    
+ 
     def pause_test(self):
         """暂停测试"""
         self.is_paused = True
-    
+
     def resume_test(self):
         """继续测试"""
         self.is_paused = False
@@ -2079,7 +2060,6 @@ class PerformanceTestWorker(QThread):
         try:
             # 总轮次包括：1个第0轮 + (轮次数 * 并发用户数)的正式测试
             total_tests = self.num_tests * self.concurrent_users
-            total_rounds = 1 + total_tests  # 加上第0轮
             
             # 更新进度条总数 - 但不显示第0轮
             self.progress_updated.emit(0, total_tests)
@@ -2142,10 +2122,10 @@ class PerformanceTestWorker(QThread):
             # 如果并发用户数大于1，则需要创建多个独立客户端实例
             if self.concurrent_users > 1:
                 # 获取Ollama版本,检查版本是否支持多实例并发,获取当前并发配置
-                version, error = self.client.get_version()
+                version = self.client.get_version()
                 supports_parallel = self.client.check_parallel_support(version)
-                if error:
-                    parallel_warning = f"无法检测Ollama版本: {error}，并发测试可能无法正常工作"
+                if not version:
+                    parallel_warning = f"无法检测Ollama版本:，并发测试可能无法正常工作"
                 if not supports_parallel:
                     parallel_warning = f"当前Ollama版本 {version} 不支持多用户并发，请升级到0.1.33及以上版本。测试将以单用户模式进行，可能无法体现真实的并发性能。"
                     self.concurrent_users = 1     
@@ -2177,7 +2157,7 @@ class PerformanceTestWorker(QThread):
                     clients.append(new_client)
 
             # 准备正式测试轮次
-            completed = 0  # 已完成的测试数（不包括第0轮）
+            completed = 0
             prompts = self.tester.select_balanced_prompts(total_tests)  # 平衡选择提示词
             
             # 设置任务超时时间（秒），防止单个任务卡住整个测试
@@ -2351,12 +2331,12 @@ class PerformanceTestWorker(QThread):
                             completed += 1
 
             # 恢复原始并发配置（如果有修改）
-            # if self.parallel_modified and self.original_parallel_config:
-            #     try:
-            #         success, msg = self.client.configure_parallel(self.original_parallel_config["num_parallel"],self.original_parallel_config["max_models"],False)
-            #         # print(f"\n恢复原始并发配置: {msg}")
-            #     except Exception as e:
-            #         print(f"\n恢复配置失败: {e}")
+            if self.parallel_modified and self.original_parallel_config:
+                try:
+                    success, msg = self.client.configure_parallel(self.original_parallel_config["num_parallel"],self.original_parallel_config["max_models"],False)
+                    # print(f"\n恢复原始并发配置: {msg}")
+                except Exception as e:
+                    print(f"\n恢复配置失败: {e}")
             
             # 生成最终报告评级
             if len(report.results) > 1:
@@ -2407,48 +2387,7 @@ class PerformanceTestWorker(QThread):
         print("-"*50)
         print(f"模型 {self.model} 性能测试完成 {date_time}")
         print("-"*50)
-            
-    def _progress_callback(self, completed, total):
-        """进度回调函数"""
-        if not self.is_cancelled:
-            self.progress_updated.emit(completed, total)
-        
-    def _round_callback(self, result, round_num):
-        """轮次完成回调函数"""
-        if not self.is_cancelled:
-            # 发送轮次完成信号
-            self.test_round_completed.emit(result, round_num)
-            
-            # 跳过第0轮的进度更新
-            if round_num == "0":
-                return
-                
-            # 基于轮次编号计算进度
-            try:
-                # 处理字符串格式的轮次编号
-                # 处理 "(1,2)" 或 "1,2" 格式
-                if "," in round_num:
-                    # 提取轮次部分
-                    cleaned_num = round_num.replace("(", "").replace(")", "")
-                    parts = cleaned_num.split(",")
-                    
-                    if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
-                        actual_round = int(parts[0])
-                        index = int(parts[1])
-                        
-                        # 只在每轮的最后一个并发请求完成时更新进度
-                        if index == self.concurrent_users:
-                            self._progress_callback(actual_round, self.num_tests)
-                else:
-                    # 非并发格式，尝试直接转为数字
-                    try:
-                        round_value = int(round_num)
-                        self._progress_callback(round_value, self.num_tests)
-                    except ValueError:
-                        pass
-            except Exception as e:
-                print(f"处理轮次回调进度更新时出错: {e}")
-    
+
     def run_single_test(self, model: str, prompt: str, prompt_type: str = "未分类", system: str = "", client = None, timeout=None) -> TestResult:
         """
         执行单次测试

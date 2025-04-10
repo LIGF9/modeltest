@@ -259,9 +259,9 @@ class MainWindow(QMainWindow):
         pass
     
     def _on_connect_clicked(self):
-        print("self.performance_tab.istesting:",self.performance_tab.istesting)
+        # print("self.performance_tab.istesting:",self.performance_tab.istesting)
         if self.performance_tab.istesting:
-            QMessageBox.warning(self, "测试中", "正在进行性能测试，请稍后再试。")
+            QMessageBox.warning(self, "测试中", "正在进行性能测试，请手动停止测试，或等待测试结束后再试。")
             return
 
         """连接按钮点击事件处理"""
@@ -362,10 +362,11 @@ class MainWindow(QMainWindow):
         connected, latency = self.ollama_client.ping()
         if connected:
             self.connection_status.setText(f"状态: 已连接")
+            self.connection_status.setStyleSheet("color:black;")  # 黑色
             self.server_latency.setText(f"延迟: {latency:.1f} ms")
         else:
             self.connection_status.setText("状态: 未连接")
-            self.connection_status.setStyleSheet("color: #e74c3c;")  # 红色加粗
+            self.connection_status.setStyleSheet("color: red;")  # 红色
             self.server_latency.setText("延迟: -- ms")
         
         # 更新并发设置状态
