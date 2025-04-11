@@ -303,9 +303,7 @@ class SystemMonitorTab(QWidget):
                 dedicated_memory = self.custom_round(gpu.get('dedicated', 0))
                 shared_memory = self.custom_round(gpu.get('shared', 0))
             
-            label_text = f"GPU #1: {gpu['name']} ({dedicated_memory} GB+{shared_memory} GB)"
-            if not is_nvidia:
-                label_text += " [非NVIDIA]"
+            label_text = f"GPU #1: {gpu['name']}(专用{dedicated_memory}GB+共享{shared_memory}GB)"
                 
             gpu_label = QLabel(label_text)
             gpu_label.setWordWrap(True)
@@ -322,9 +320,7 @@ class SystemMonitorTab(QWidget):
                 dedicated_memory = self.custom_round(gpu.get('dedicated', 0))
                 shared_memory = self.custom_round(gpu.get('shared', 0))
             
-            label_text = f"GPU #2: {gpu['name']} ({dedicated_memory} GB+{shared_memory} GB)"
-            if not is_nvidia:
-                label_text += " [非NVIDIA]"
+            label_text = f"GPU #2: {gpu['name']}(专用{dedicated_memory}GB+共享{shared_memory}GB)"
                 
             gpu_label = QLabel(label_text)
             gpu_label.setWordWrap(True)
@@ -344,12 +340,9 @@ class SystemMonitorTab(QWidget):
                     shared_memory = self.custom_round(gpu.get('shared', 0))
                 
                 if total_gpus == 1:
-                    label_text = f"GPU: {gpu['name']} ({dedicated_memory} GB+{shared_memory} GB)"
+                    label_text = f"GPU: {gpu['name']}(专用{dedicated_memory}GB+共享{shared_memory}GB)"
                 else:
-                    label_text = f"GPU #{i+1}: {gpu['name']} ({dedicated_memory} GB+{shared_memory} GB)"
-                    
-                if not is_nvidia:
-                    label_text += " [非NVIDIA]"
+                    label_text = f"GPU #{i+1}: {gpu['name']}(专用{dedicated_memory}GB+共享{shared_memory}GB)"
                     
                 gpu_label = QLabel(label_text)
                 gpu_label.setWordWrap(True)
@@ -423,18 +416,6 @@ class SystemMonitorTab(QWidget):
                 non_nvidia_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 non_nvidia_label.setStyleSheet("color: #e74c3c; font-weight: bold;")
                 gpu_layout.addWidget(non_nvidia_label)
-                
-                # 显示静态信息
-                if "name" in gpu:
-                    gpu_name_label = QLabel(f"显卡型号: {gpu['name']}")
-                    gpu_layout.addWidget(gpu_name_label)
-                
-                # 修改显存显示格式为"专用xx GB+共享xx GB"
-                dedicated_memory = self.custom_round(gpu.get("dedicated", 0))
-                shared_memory = self.custom_round(gpu.get("shared", 0))
-                memory_label = QLabel(f"显存大小: 专用{dedicated_memory} GB + 共享{shared_memory} GB")
-                gpu_layout.addWidget(memory_label)
-                
                 self.gpu_metrics.append({"static_only": True})
             
             self.gpu_metrics_layout.addWidget(gpu_group)

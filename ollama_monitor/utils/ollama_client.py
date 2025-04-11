@@ -272,7 +272,7 @@ class OllamaClient:
         if platform.system() != 'Windows':
             try:
                 output = subprocess.run(["systemctl", "show", "ollama", "--property=Environment"],
-                                    capture_output=True, text=True).stdout
+                                    capture_output=True, text=True,creationflags=subprocess.CREATE_NO_WINDOW).stdout
                 if "OLLAMA_NUM_PARALLEL" in output:
                     num_parallel = re.search(r"OLLAMA_NUM_PARALLEL=(\d+)", output).group(1)
                     max_models = re.search(r"OLLAMA_MAX_LOADED_MODELS=(\d+)", output)
@@ -368,8 +368,8 @@ class OllamaClient:
                             f.write(content)
                             f.truncate()
                         
-                        subprocess.run(["systemctl", "daemon-reload"], check=True)
-                        subprocess.run(["systemctl", "restart", "ollama"], check=True)
+                        subprocess.run(["systemctl", "daemon-reload"], check=True,creationflags=subprocess.CREATE_NO_WINDOW)
+                        subprocess.run(["systemctl", "restart", "ollama"], check=True,creationflags=subprocess.CREATE_NO_WINDOW)
                         return (True, "systemd 配置已持久化")
                     except subprocess.CalledProcessError as e:
                         return (False, f"服务重启失败: {str(e)}")
@@ -398,14 +398,14 @@ class OllamaServiceController:
             if self.is_windows:
                 # Windows 系统下的命令执行优化
                 if "start /B" in command and not check_output:
-                    # 使用subprocess.CREATE_NEW_CONSOLE处理后台进程
+                    # 使用subprocess.CREATE_NO_WINDOW处理后台进程
                     process = subprocess.Popen(
                         command,
                         shell=True,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
                         stdin=subprocess.PIPE,
-                        creationflags=subprocess.CREATE_NEW_CONSOLE,
+                        creationflags=subprocess.CREATE_NO_WINDOW,
                         text=True
                     )
                     return True
@@ -417,7 +417,8 @@ class OllamaServiceController:
                     command, 
                     shell=True, 
                     stderr=subprocess.PIPE, 
-                    text=True
+                    text=True,
+                    creationflags=subprocess.CREATE_NO_WINDOW
                 ).strip()
             else:
                 subprocess.Popen(
@@ -426,7 +427,8 @@ class OllamaServiceController:
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     stdin=subprocess.PIPE,
-                    start_new_session=not self.is_windows
+                    start_new_session=not self.is_windows,
+                    creationflags=subprocess.CREATE_NO_WINDOW
                 )
                 return True
         except subprocess.CalledProcessError as e:

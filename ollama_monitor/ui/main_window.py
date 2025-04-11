@@ -23,7 +23,6 @@ from .tabs.chat_tab import ChatTab
 from .tabs.performance_tab import PerformanceTab
 from .dialogs.concurrency_dialog import ConcurrencySettingsDialog
 
-
 class MainWindow(QMainWindow):
     """应用程序主窗口类"""
     
@@ -50,7 +49,7 @@ class MainWindow(QMainWindow):
         else:
             print("\nollama运行正常")
         config = self.ollama_client.get_current_config()
-        # print("config",config)
+        
         # 检查并发设置
         if config["parallel_enabled"]:
             print(f"ollama并发配置: {config['num_parallel']}并发/{config['max_models']}模型","\n")
@@ -275,6 +274,10 @@ class MainWindow(QMainWindow):
 
         """连接按钮点击事件处理"""
         server_url = self.server_input.currentText()
+
+        if server_url == self.ollama_client.base_url:
+            QMessageBox.warning(self, "连接状态", "已连接到当前服务器，状态正常")
+            return
         
         # 验证URL格式
         if not (server_url.startswith("http://") or server_url.startswith("https://")):

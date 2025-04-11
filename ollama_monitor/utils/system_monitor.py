@@ -314,10 +314,11 @@ class SystemMonitor:
                 
                 # 使用wmic命令获取GPU信息
                 gpu_cmd = subprocess.run(
-                    ["wmic", "path", "win32_VideoController", "get", "Name,AdapterRAM,DriverVersion"], 
-                    capture_output=True, 
-                    text=True, 
-                    check=False
+                    ['powershell', '-Command', 'Get-WmiObject Win32_VideoController | Select-Object Name, AdapterRAM, DriverVersion | Format-Table -AutoSize'],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    creationflags=subprocess.CREATE_NO_WINDOW
                 )
                 
                 if gpu_cmd.returncode == 0:
@@ -380,7 +381,8 @@ class SystemMonitor:
                         ["powershell", "-Command", ps_cmd],
                         capture_output=True,
                         text=True,
-                        check=False
+                        check=False,
+                        creationflags=subprocess.CREATE_NO_WINDOW
                     )
                     
                     if ps_result.returncode == 0:
@@ -455,10 +457,16 @@ class SystemMonitor:
                     # 使用reg query命令查询AMD显卡的注册表信息
                     reg_cmd = "reg query \"HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}\" /s /v \"HardwareInformation.qwMemorySize\""
                     reg_result = subprocess.run(
-                        ["cmd", "/c", reg_cmd],
+                        ['powershell', '-Command', f'''
+                            # 替换cmd风格的reg命令为PowerShell等效命令
+                            $regPath = "HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion"
+                            $valueName = "ProgramFilesDir"
+                            Get-ItemProperty -Path $regPath -Name $valueName | Select-Object $valueName
+                        '''],
                         capture_output=True,
                         text=True,
-                        check=False
+                        check=False,
+                        creationflags=subprocess.CREATE_NO_WINDOW
                     )
                     
                     if reg_result.returncode == 0:
@@ -483,10 +491,16 @@ class SystemMonitor:
                                         # 需要查询对应项的显卡名称
                                         device_desc_cmd = f"reg query \"{current_key}\" /v \"DriverDesc\""
                                         desc_result = subprocess.run(
-                                            ["cmd", "/c", device_desc_cmd],
+                                            ['powershell', '-Command', '''
+                                                # PowerShell 替代方案
+                                                Get-PnpDevice | Select-Object DeviceID, Description | Format-List
+                                                # 或者使用 CIM/WMI 方式
+                                                # Get-CimInstance Win32_PnPEntity | Select-Object DeviceID, Description | Format-List
+                                            '''],
                                             capture_output=True,
                                             text=True,
-                                            check=False
+                                            check=False,
+                                            creationflags=subprocess.CREATE_NO_WINDOW
                                         )
                                         
                                         if desc_result.returncode == 0:
@@ -535,10 +549,11 @@ class SystemMonitor:
                 
                 # 首先尝试使用lspci命令
                 gpu_cmd = subprocess.run(
-                    ["lspci", "-v"], 
+                    ['powershell', '-Command',"lspci", "-v"], 
                     capture_output=True, 
                     text=True, 
-                    check=False
+                    check=False,
+                    creationflags=subprocess.CREATE_NO_WINDOW
                 )
                 
                 if gpu_cmd.returncode == 0:
@@ -575,10 +590,11 @@ class SystemMonitor:
                 # 尝试使用nvidia-smi获取NVIDIA GPU信息
                 if not gpu_info or any(gpu["memory_total"] == 0 for gpu in gpu_info):
                     nvidia_cmd = subprocess.run(
-                        ["nvidia-smi", "--query-gpu=index,name,memory.total,driver_version", "--format=csv"], 
+                        ['powershell', '-Command',"nvidia-smi", "--query-gpu=index,name,memory.total,driver_version", "--format=csv"], 
                         capture_output=True, 
                         text=True, 
-                        check=False
+                        check=False,
+                        creationflags=subprocess.CREATE_NO_WINDOW
                     )
                     
                     if nvidia_cmd.returncode == 0:
@@ -649,10 +665,11 @@ class SystemMonitor:
                 # 尝试使用rocm-smi获取AMD GPU信息
                 if not gpu_info or any(gpu["vendor"] == "AMD" and gpu["memory_total"] == 0 for gpu in gpu_info):
                     rocm_cmd = subprocess.run(
-                        ["rocm-smi", "--showmeminfo", "vram"], 
+                        ['powershell', '-Command',"rocm-smi", "--showmeminfo", "vram"], 
                         capture_output=True, 
                         text=True, 
-                        check=False
+                        check=False,
+                        creationflags=subprocess.CREATE_NO_WINDOW
                     )
                     
                     if rocm_cmd.returncode == 0:
@@ -710,10 +727,11 @@ class SystemMonitor:
                 
                 # 使用system_profiler获取GPU信息
                 gpu_cmd = subprocess.run(
-                    ["system_profiler", "SPDisplaysDataType"], 
+                    ['powershell', '-Command',"system_profiler", "SPDisplaysDataType"], 
                     capture_output=True, 
                     text=True, 
-                    check=False
+                    check=False,
+                    creationflags=subprocess.CREATE_NO_WINDOW
                 )
                 
                 if gpu_cmd.returncode == 0:
@@ -846,10 +864,11 @@ class SystemMonitor:
                     try:
                         # 使用nvidia-smi命令获取GPU利用率
                         nvidia_cmd = subprocess.run(
-                            ["nvidia-smi", "--query-gpu=index,utilization.gpu,utilization.memory,memory.used,memory.total,temperature.gpu,power.draw", "--format=csv"], 
+                            ['powershell', '-Command',"nvidia-smi", "--query-gpu=index,utilization.gpu,utilization.memory,memory.used,memory.total,temperature.gpu,power.draw", "--format=csv"], 
                             capture_output=True, 
                             text=True, 
-                            check=False
+                            check=False,
+                            creationflags=subprocess.CREATE_NO_WINDOW
                         )
                         
                         if nvidia_cmd.returncode == 0:

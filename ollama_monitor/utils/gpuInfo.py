@@ -87,7 +87,8 @@ class GPUInfoCollector:
             output = subprocess.check_output(
                 "wmic MemoryChip get Capacity",
                 shell=True,
-                stderr=subprocess.STDOUT
+                stderr=subprocess.STDOUT,
+                creationflags=subprocess.CREATE_NO_WINDOW,
             ).decode('utf-8', errors='ignore')
             
             # 提取所有内存容量并求和
@@ -123,6 +124,7 @@ class GPUInfoCollector:
             capture_output=True,
             text=True,
             encoding='utf-8',
+            creationflags=subprocess.CREATE_NO_WINDOW,
             errors='ignore'  # 忽略编码错误
         )
 
@@ -184,12 +186,13 @@ class GPUInfoCollector:
         try:
             # 执行dxdiag并保存到临时文件
             result = subprocess.run(
-                ['dxdiag', '/t', temp_filename],
+                ['powershell', '-Command', f'dxdiag /t {temp_filename}'],
                 check=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 timeout=60,
-                text=True
+                text=True,
+                creationflags=subprocess.CREATE_NO_WINDOW,
             )
             # 重置结果集
             self.results = []

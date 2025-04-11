@@ -1,0 +1,12 @@
+# 构建输出目录
+dist/
+build/
+
+# 特定文件
+gpu_raw_output.txt
+main.spec
+
+# Python 相关
+__pycache__/
+*.py[cod]
+*$py.class 
